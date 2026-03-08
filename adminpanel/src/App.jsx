@@ -1,34 +1,34 @@
-import React, { useState } from 'react'
-import ListFood from './pages/ListFood/ListFood'
-import Sidebar from './components/Sidebar/Sidebar'
-import Menubar from './components/Menubar/Menubar'
-import { Route, Routes } from 'react-router-dom'
-import AddFood from './pages/AddFood/AddFood'
-import Orders from './pages/Orders/Orders'
+import React, { use, useState } from 'react';
+import { Route, Routes } from 'react-router-dom';
+import AddFood from './pages/AddFood/AddFood';
+import ListFood from './pages/ListFood/ListFood';
+import Orders from './pages/Orders/Orders';
+import Sidebar from './components/Sidebar/Sidebar';
+import Menubar from './components/Menubar/Menubar';
+import { ToastContainer } from 'react-toastify';
 
 const App = () => {
-
-  const [sidebarvisible, setSidebarvisible] = useState(true);
+  const [sidebarVisible, setSidebarVisible] = useState(true);
 
   const toggleSidebar = () => {
-    setSidebarvisible(!sidebarvisible);
-  }
-
+    setSidebarVisible(!sidebarVisible);
+  } 
   return (
     <div className="d-flex" id="wrapper">
             
-            <Sidebar sidebarvisible={sidebarvisible} />
+            <Sidebar sidebarVisible={sidebarVisible}/>
             
             <div id="page-content-wrapper">
                 
                 <Menubar toggleSidebar={toggleSidebar} />
+                <ToastContainer />
                 
                 <div className="container-fluid">
                     <Routes>
-                      <Route path = "/add" element={<AddFood />} />
-                      <Route path = "/list" element={<ListFood />} />
-                      <Route path = "/orders" element={<Orders />} />
-                      <Route path = "/" element={<ListFood />} />
+                      <Route path='/add' element={<AddFood />} />
+                      <Route path='/list' element={<ListFood />} />
+                      <Route path='/orders' element={<Orders />} />
+                      <Route path='/' element={<ListFood />} />
                     </Routes>
                 </div>
             </div>
@@ -36,4 +36,4 @@ const App = () => {
   )
 }
 
-export default App
+export default App;

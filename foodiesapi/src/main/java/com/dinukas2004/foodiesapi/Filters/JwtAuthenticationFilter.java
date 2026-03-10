@@ -1,6 +1,5 @@
 package com.dinukas2004.foodiesapi.Filters;
 
-
 import com.dinukas2004.foodiesapi.util.JwtUtil;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

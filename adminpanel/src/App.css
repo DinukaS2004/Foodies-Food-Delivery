@@ -1,0 +1,17 @@
+/* App-level layout overrides */
+html,
+body,
+#root,
+#wrapper,
+#page-content-wrapper,
+.container-fluid {
+  background-color: var(--bg-root) !important;
+}
+
+#page-content-wrapper {
+  min-height: 100vh;
+}
+
+.container-fluid {
+  padding: 0 !important;
+}

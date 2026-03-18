@@ -1,17 +1,16 @@
 package com.dinukas2004.foodiesapi.service;
 
-import com.razorpay.RazorpayException;
-import com.dinukas2004.foodiesapi.io.OrderResponse;
 import com.dinukas2004.foodiesapi.io.OrderRequest;
+import com.dinukas2004.foodiesapi.io.OrderResponse;
 
 import java.util.List;
 import java.util.Map;
 
 public interface OrderService {
 
-    OrderResponse createOrderWithPayment(OrderRequest request) throws RazorpayException;
+    OrderResponse createOrderWithPayment(OrderRequest request);
 
-    void verifyPayment(Map<String, String> paymentData, String status);
+    void verifyPayment(Map<String, String> notifyData);
 
     List<OrderResponse> getUserOrders();
 
@@ -21,4 +20,3 @@ public interface OrderService {
 
     void updateOrderStatus(String orderId, String status);
 }
-

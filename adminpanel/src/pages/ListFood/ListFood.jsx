@@ -54,7 +54,7 @@ const ListFood = () => {
                   </td>
                   <td>{item.name}</td>
                   <td>{item.category}</td>
-                  <td>&#8377;{item.price}.00</td>
+                  <td>Rs: {item.price}.00</td>
                   <td className="text-danger">
                     <i
                       class="bi bi-trash-fill fs-4"

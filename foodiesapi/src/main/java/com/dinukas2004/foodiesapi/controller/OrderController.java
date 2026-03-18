@@ -1,6 +1,5 @@
 package com.dinukas2004.foodiesapi.controller;
 
-import com.razorpay.RazorpayException;
 import com.dinukas2004.foodiesapi.io.OrderRequest;
 import com.dinukas2004.foodiesapi.io.OrderResponse;
 import com.dinukas2004.foodiesapi.service.OrderService;
@@ -14,21 +13,28 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/orders")
 @AllArgsConstructor
-
 public class OrderController {
 
     private final OrderService orderService;
 
+    /**
+     * Creates an order and returns PayHere checkout parameters.
+     * The frontend uses these parameters to submit the PayHere payment form.
+     */
     @PostMapping("/create")
     @ResponseStatus(HttpStatus.CREATED)
-    public OrderResponse createOrderWithPayment(@RequestBody OrderRequest request) throws RazorpayException {
-        OrderResponse response = orderService.createOrderWithPayment(request);
-        return response;
+    public OrderResponse createOrderWithPayment(@RequestBody OrderRequest request) {
+        return orderService.createOrderWithPayment(request);
     }
 
-    @PostMapping("/verify")
-    public void verifyPayment(@RequestBody Map<String, String> paymentData) {
-        orderService.verifyPayment(paymentData, "Paid");
+    /**
+     * PayHere notify URL — called server-to-server by PayHere after payment.
+     * Must be a publicly accessible URL (use ngrok in development).
+     * PayHere docs: https://support.payhere.lk/api-&-mobile-sdk/payhere-checkout
+     */
+    @PostMapping("/notify")
+    public void payhereNotify(@RequestParam Map<String, String> notifyData) {
+        orderService.verifyPayment(notifyData);
     }
 
     @GetMapping
@@ -42,13 +48,13 @@ public class OrderController {
         orderService.removeOrder(orderId);
     }
 
-    //admin panel
+    // Admin panel
     @GetMapping("/all")
     public List<OrderResponse> getOrdersOfAllUsers() {
         return orderService.getOrdersOfAllUsers();
     }
 
-    //admin panel
+    // Admin panel
     @PatchMapping("/status/{orderId}")
     public void updateOrderStatus(@PathVariable String orderId, @RequestParam String status) {
         orderService.updateOrderStatus(orderId, status);

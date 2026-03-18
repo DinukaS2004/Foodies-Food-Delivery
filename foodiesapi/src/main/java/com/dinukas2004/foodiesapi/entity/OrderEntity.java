@@ -20,9 +20,9 @@ public class OrderEntity {
     private String email;
     private List<OrderItem> orderedItems;
     private double amount;
-    private String paymentStatus;
-    private String razorpayOrderId;
-    private String razorpaySignature;
-    private String razorpayPaymentId;
+    private String currency;
+    private String paymentStatus;       // "Pending", "Paid", "Failed", "Cancelled"
+    private String payhereOrderId;      // Our internal order ID sent to PayHere
+    private String payherePaymentId;    // PayHere's payment_id from notify
     private String orderStatus;
 }

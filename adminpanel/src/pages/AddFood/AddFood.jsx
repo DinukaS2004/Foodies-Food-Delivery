@@ -61,7 +61,7 @@ const AddFood = () => {
             <select name="category" id="category" className='form-control' onChange={onChangeHandler} value={data.category}>
                 <option value="Biryani">Biryani</option>
                 <option value="Cake">Cake</option>
-                <option value="Burger">Buger</option>
+                <option value="Burger">Burger</option>
                 <option value="Pizza">Pizza</option>
                 <option value="Rolls">Rolls</option>
                 <option value="Salad">Salad</option>
@@ -70,7 +70,7 @@ const AddFood = () => {
           </div>
           <div className="mb-3">
             <label htmlFor="price" className="form-label">Price</label>
-            <input type="number" name="price" id="price" placeholder='&#8377;200' className='form-control' onChange={onChangeHandler} value={data.price} />
+            <input type="number" name="price" id="price" placeholder='Rs:200' className='form-control' onChange={onChangeHandler} value={data.price} />
           </div>
           <button type="submit" className="btn btn-primary">Save</button>
         </form>

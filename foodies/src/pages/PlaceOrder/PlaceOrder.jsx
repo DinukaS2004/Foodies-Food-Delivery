@@ -4,19 +4,14 @@ import { assets } from "../../assets/assets";
 import { StoreContext } from "../../context/StoreContext";
 import { calculateCartTotals } from "../../util/cartUtils";
 import { toast } from "react-toastify";
-import { RAZORPAY_KEY } from "../../util/contants";
 import { useNavigate } from "react-router-dom";
-import {
-  createOrder,
-  deleteOrder,
-  verifyPayment,
-} from "../../service/orderService";
-import { clearCartItems } from "../../service/cartService";
+import { createOrder, deleteOrder } from "../../service/orderService";
 
 const PlaceOrder = () => {
   const { foodList, quantities, setQuantities, token } =
     useContext(StoreContext);
   const navigate = useNavigate();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [data, setData] = useState({
     firstName: "",
@@ -24,21 +19,22 @@ const PlaceOrder = () => {
     email: "",
     phoneNumber: "",
     address: "",
-    state: "",
+    province: "",
     city: "",
     zip: "",
   });
 
   const onChangeHandler = (event) => {
-    const name = event.target.name;
-    const value = event.target.value;
-    setData((data) => ({ ...data, [name]: value }));
+    const { name, value } = event.target;
+    setData((prev) => ({ ...prev, [name]: value }));
   };
 
   const onSubmitHandler = async (event) => {
     event.preventDefault();
+    setIsSubmitting(true);
+
     const orderData = {
-      userAddress: `${data.firstName} ${data.lastName}, ${data.address}, ${data.city}, ${data.state}, ${data.zip}`,
+      userAddress: `${data.firstName} ${data.lastName}, ${data.address}, ${data.city}, ${data.province}, ${data.zip}`,
       phoneNumber: data.phoneNumber,
       email: data.email,
       orderedItems: cartItems.map((item) => ({
@@ -56,85 +52,72 @@ const PlaceOrder = () => {
 
     try {
       const response = await createOrder(orderData, token);
-      if (response.razorpayOrderId) {
-        // initiate the payment
-        initiateRazorpayPayment(response);
+
+      // Backend returns PayHere checkout params when order is created
+      if (response && response.payhereOrderId && response.hash) {
+        initiatePayherePayment(response);
       } else {
         toast.error("Unable to place order. Please try again.");
+        setIsSubmitting(false);
       }
     } catch (error) {
       toast.error("Unable to place order. Please try again.");
+      setIsSubmitting(false);
     }
   };
 
-  const initiateRazorpayPayment = (order) => {
-    const options = {
-      key: RAZORPAY_KEY,
-      amount: order.amount, //Convert to paise
-      currency: "INR",
-      name: "Food Land",
-      description: "Food order payment",
-      order_id: order.razorpayOrderId,
-      handler: verifyPaymentHandler,
-      prefill: {
-        name: `${data.firstName} ${data.lastName}`,
-        email: data.email,
-        contact: data.phoneNumber,
-      },
-      theme: { color: "#3399cc" },
-      modal: {
-        ondismiss: deleteOrderHandler,
-      },
+  /**
+   * PayHere requires a form POST to their checkout URL.
+   * We build a hidden form dynamically and submit it.
+   * PayHere will then redirect to return_url / cancel_url.
+   * Payment confirmation happens server-side via the notify_url.
+   */
+  const initiatePayherePayment = (order) => {
+    // Build the items description string from cart
+    const itemsDescription = cartItems
+      .map((item) => `${item.name} x${quantities[item.id]}`)
+      .join(", ");
+
+    const formFields = {
+      merchant_id:  order.merchantId,
+      return_url:   order.returnUrl,
+      cancel_url:   order.cancelUrl,
+      notify_url:   order.notifyUrl,
+      order_id:     order.payhereOrderId,
+      items:        itemsDescription,
+      currency:     order.currency || "LKR",
+      amount:       Number(order.amount).toFixed(2),
+      first_name:   data.firstName,
+      last_name:    data.lastName,
+      email:        data.email,
+      phone:        data.phoneNumber,
+      address:      data.address,
+      city:         data.city,
+      country:      "Sri Lanka",
+      hash:         order.hash,
     };
-    const razorpay = new window.Razorpay(options);
-    razorpay.open();
+
+    // Create a hidden form and submit it to PayHere
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = order.checkoutUrl; // e.g. https://sandbox.payhere.lk/pay/checkout
+
+    Object.entries(formFields).forEach(([key, value]) => {
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = key;
+      input.value = value;
+      form.appendChild(input);
+    });
+
+    document.body.appendChild(form);
+    form.submit(); // Redirects the user to PayHere's hosted checkout page
   };
 
-  const verifyPaymentHandler = async (razorpayResponse) => {
-    const paymentData = {
-      razorpay_payment_id: razorpayResponse.razorpay_payment_id,
-      razorpay_order_id: razorpayResponse.razorpay_order_id,
-      razorpay_signature: razorpayResponse.razorpay_signature,
-    };
-    try {
-      const success = await verifyPayment(paymentData, token);
-      if (success) {
-        toast.success("Payment successful.");
-        await clearCart();
-        navigate("/myorders");
-      } else {
-        toast.error("Payment failed. Please try again.");
-        navigate("/");
-      }
-    } catch (error) {
-      toast.error("Payment failed. Please try again.");
-    }
-  };
-
-  const deleteOrderHandler = async (orderId) => {
-    try {
-      await deleteOrder(orderId, token);
-    } catch (error) {
-      toast.error("Something went wrong. Contact support.");
-    }
-  };
-
-  const clearCart = async () => {
-    try {
-      await clearCartItems(token, setQuantities);
-    } catch (error) {
-      toast.error("Error while clearing the cart.");
-    }
-  };
-
-  //cart items
+  // Cart items
   const cartItems = foodList.filter((food) => quantities[food.id] > 0);
+  const { subtotal, shipping, tax, total } = calculateCartTotals(cartItems, quantities);
 
-  //calcualtiong
-  const { subtotal, shipping, tax, total } = calculateCartTotals(
-    cartItems,
-    quantities
-  );
   return (
     <div className="container mt-4">
       <main>
@@ -148,6 +131,7 @@ const PlaceOrder = () => {
           />
         </div>
         <div className="row g-5">
+          {/* ── Order Summary ── */}
           <div className="col-md-5 col-lg-4 order-md-last">
             <h4 className="d-flex justify-content-between align-items-center mb-3">
               <span className="text-primary">Your cart</span>
@@ -168,33 +152,48 @@ const PlaceOrder = () => {
                     </small>
                   </div>
                   <span className="text-body-secondary">
-                    &#8377;{item.price * quantities[item.id]}
+                    LKR {(item.price * quantities[item.id]).toFixed(2)}
                   </span>
                 </li>
               ))}
+
               <li className="list-group-item d-flex justify-content-between">
-                <div>
-                  <span>Shipping</span>
-                </div>
+                <span>Shipping</span>
                 <span className="text-body-secondary">
-                  &#8377;{subtotal === 0 ? 0.0 : shipping.toFixed(2)}
-                </span>
-              </li>
-              <li className="list-group-item d-flex justify-content-between">
-                <div>
-                  <span>Tax (10%)</span>
-                </div>
-                <span className="text-body-secondary">
-                  &#8377;{tax.toFixed(2)}
+                  LKR {subtotal === 0 ? "0.00" : shipping.toFixed(2)}
                 </span>
               </li>
 
               <li className="list-group-item d-flex justify-content-between">
-                <span>Total (INR)</span>
-                <strong>&#8377;{total.toFixed(2)}</strong>
+                <span>Tax (10%)</span>
+                <span className="text-body-secondary">
+                  LKR {tax.toFixed(2)}
+                </span>
+              </li>
+
+              <li className="list-group-item d-flex justify-content-between">
+                <span>Total (LKR)</span>
+                <strong>LKR {total.toFixed(2)}</strong>
               </li>
             </ul>
+
+            {/* PayHere badge */}
+            <div className="text-center mt-2">
+              <small className="text-muted">
+                Secured by{" "}
+                <a
+                  href="https://www.payhere.lk"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-decoration-none fw-semibold"
+                >
+                  PayHere
+                </a>
+              </small>
+            </div>
           </div>
+
+          {/* ── Billing Form ── */}
           <div className="col-md-7 col-lg-8">
             <h4 className="mb-3">Billing address</h4>
             <form className="needs-validation" onSubmit={onSubmitHandler}>
@@ -207,7 +206,7 @@ const PlaceOrder = () => {
                     type="text"
                     className="form-control"
                     id="firstName"
-                    placeholder="Jhon"
+                    placeholder="Kasun"
                     required
                     name="firstName"
                     onChange={onChangeHandler}
@@ -223,7 +222,7 @@ const PlaceOrder = () => {
                     type="text"
                     className="form-control"
                     id="lastName"
-                    placeholder="Doe"
+                    placeholder="Perera"
                     value={data.lastName}
                     onChange={onChangeHandler}
                     name="lastName"
@@ -241,7 +240,7 @@ const PlaceOrder = () => {
                       type="email"
                       className="form-control"
                       id="email"
-                      placeholder="Email"
+                      placeholder="you@example.com"
                       required
                       name="email"
                       onChange={onChangeHandler}
@@ -249,21 +248,23 @@ const PlaceOrder = () => {
                     />
                   </div>
                 </div>
+
                 <div className="col-12">
                   <label htmlFor="phone" className="form-label">
                     Phone Number
                   </label>
                   <input
-                    type="number"
+                    type="tel"
                     className="form-control"
                     id="phone"
-                    placeholder="9876543210"
+                    placeholder="0771234567"
                     required
                     value={data.phoneNumber}
                     name="phoneNumber"
                     onChange={onChangeHandler}
                   />
                 </div>
+
                 <div className="col-12">
                   <label htmlFor="address" className="form-label">
                     Address
@@ -272,27 +273,36 @@ const PlaceOrder = () => {
                     type="text"
                     className="form-control"
                     id="address"
-                    placeholder="1234 Main St"
+                    placeholder="No. 12, Galle Road"
                     required
                     value={data.address}
                     name="address"
                     onChange={onChangeHandler}
                   />
                 </div>
+
                 <div className="col-md-5">
-                  <label htmlFor="state" className="form-label">
-                    State
+                  <label htmlFor="province" className="form-label">
+                    Province
                   </label>
                   <select
                     className="form-select"
-                    id="state"
+                    id="province"
                     required
-                    name="state"
-                    value={data.state}
+                    name="province"
+                    value={data.province}
                     onChange={onChangeHandler}
                   >
                     <option value="">Choose...</option>
-                    <option>Karnataka</option>
+                    <option>Western</option>
+                    <option>Central</option>
+                    <option>Southern</option>
+                    <option>Northern</option>
+                    <option>Eastern</option>
+                    <option>North Western</option>
+                    <option>North Central</option>
+                    <option>Uva</option>
+                    <option>Sabaragamuwa</option>
                   </select>
                 </div>
 
@@ -300,28 +310,27 @@ const PlaceOrder = () => {
                   <label htmlFor="city" className="form-label">
                     City
                   </label>
-                  <select
-                    className="form-select"
+                  <input
+                    type="text"
+                    className="form-control"
                     id="city"
+                    placeholder="Colombo"
                     required
                     name="city"
                     value={data.city}
                     onChange={onChangeHandler}
-                  >
-                    <option value="">Choose...</option>
-                    <option>Banglore</option>
-                  </select>
+                  />
                 </div>
 
                 <div className="col-md-3">
                   <label htmlFor="zip" className="form-label">
-                    Zip
+                    Postal Code
                   </label>
                   <input
-                    type="number"
+                    type="text"
                     className="form-control"
                     id="zip"
-                    placeholder="98745"
+                    placeholder="10100"
                     required
                     name="zip"
                     value={data.zip}
@@ -335,9 +344,20 @@ const PlaceOrder = () => {
               <button
                 className="w-100 btn btn-primary btn-lg"
                 type="submit"
-                disabled={cartItems.length === 0}
+                disabled={cartItems.length === 0 || isSubmitting}
               >
-                Continue to checkout
+                {isSubmitting ? (
+                  <>
+                    <span
+                      className="spinner-border spinner-border-sm me-2"
+                      role="status"
+                      aria-hidden="true"
+                    />
+                    Redirecting to PayHere...
+                  </>
+                ) : (
+                  "Continue to checkout"
+                )}
               </button>
             </form>
           </div>
